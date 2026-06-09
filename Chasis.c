@@ -6,14 +6,14 @@
  * 
  */  
    
- //LCD en Puerto C   
+ //LCD en Puerto D   
 #asm
-    .equ __lcd_port=0x08 
+    .equ __lcd_port=0x0B 
     .equ __lcd_RS=2
     .equ __lcd_EN=3
-    .equ __lcd_D4=4
+    .equ __lcd_D4=4               
     .equ __lcd_D5=5
-    .equ __lcd_D6=6
+    .equ __lcd_D6=6          
     .equ __lcd_D7=7
 #endasm
 
@@ -34,11 +34,11 @@ char buffer_lcd[16];
 //FUNCIONES DE MOVIMIENTO 
 void frenar(void)
 {
-    // Apaga Lado Izquierdo (PB1 y PB2)
-    PORTB.1 = 0; PORTB.2 = 0; 
+    // Apaga Lado Izquierdo (PB1 y PB3)
+    PORTB.1 = 0; PORTB.3 = 0; 
     
-    // Apaga Lado Derecho (PB3 y PD3)
-    PORTB.3 = 0; PORTD.3 = 0; 
+    // Apaga Lado Derecho (PB2 y PB4)
+    PORTB.2 = 0; PORTB.4 = 0; 
 }
 
 void avanzar(void)
@@ -46,30 +46,30 @@ void avanzar(void)
     frenar();  
     
     // Lado Izquierdo Adelante
-    PORTB.1 = 1; PORTB.2 = 0; 
+    PORTB.1 = 1; PORTB.3 = 0; 
     
     // Lado Derecho Adelante
-    PORTB.3 = 1; PORTD.3 = 0;  
+    PORTB.2 = 1; PORTB.4 = 0;  
 }
 
 void girar_derecha(void)
 {
     frenar();
     // Lado Izquierdo Adelante
-    PORTB.1 = 1; PORTB.2 = 0;
+    PORTB.1 = 1; PORTB.3 = 0;
     
     // Lado Derecho Atrás (Giro tipo tanque)
-    PORTB.3 = 0; PORTD.3 = 1;
+    PORTB.2 = 0; PORTB.4 = 1;
 }
 
 void girar_izquierda(void)
 {
     frenar();
     // Lado Izquierdo Atrás (Giro tipo tanque)
-    PORTB.1 = 0; PORTB.2 = 1;
+    PORTB.1 = 0; PORTB.3 = 1;
     
     // Lado Derecho Adelante
-    PORTB.3 = 1; PORTD.3 = 0;
+    PORTB.2 = 1; PORTB.4 = 0;
 }
 
 // --- MANIOBRA DE VUELTA EN U ---
@@ -107,7 +107,7 @@ void main(void)
     
     // Configurar pines de motores como salidas (DDR = 1)
     DDRB.1 = 1; DDRB.2 = 1; // Lado Izquierdo (PB1 y PB2)
-    DDRB.3 = 1; DDRD.3 = 1; // Lado Derecho (PB3 y PD3)
+    DDRB.3 = 1; DDRB.4 = 1; // Lado Derecho (PB3 y PD3)
     
     frenar();
     
