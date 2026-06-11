@@ -7,7 +7,7 @@ Raspberry Pi 4 → /dev/ttyAMA0 a 9600 baudios
 import serial
 import threading
 
-PUERTO  = "/dev/ttyAMA0"
+PUERTO  = "/dev/ttyS0"
 BAUDIOS = 9600
 
 
