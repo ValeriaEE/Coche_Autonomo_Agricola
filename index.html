@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Robot Agrícola</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #1a1a2e;
+      color: #e0e0e0;
+      font-family: 'Courier New', monospace;
+      padding: 24px;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 1.2rem;
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+    }
+
+    #estado-robot {
+      text-align: center;
+      font-size: 1rem;
+      font-weight: bold;
+      margin-bottom: 20px;
+      padding: 6px;
+      border-radius: 4px;
+    }
+
+    .contenedor {
+      display: flex;
+      gap: 24px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    /* ── Mapa ── */
+    .panel {
+      background: #16213e;
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .panel-titulo {
+      font-size: 0.75rem;
+      color: #7a7a9a;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+
+    #mapa {
+      display: grid;
+      grid-template-columns: repeat(6, 52px);
+      gap: 4px;
+    }
+
+    .celda {
+      width: 52px;
+      height: 44px;
+      background: #2d2d4a;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      font-weight: bold;
+      transition: background 0.4s;
+      border: 2px solid transparent;
+    }
+
+    .celda.humedo  { background: #1a7a4a; }
+    .celda.seco    { background: #8b1a1a; }
+
+    /* Leyenda */
+    .leyenda {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      margin-top: 10px;
+      font-size: 0.75rem;
+      color: #7a7a9a;
+    }
+    .leyenda span { display: flex; align-items: center; gap: 4px; }
+    .dot { width: 12px; height: 12px; border-radius: 2px; }
+
+    /* Contador */
+    #contador {
+      text-align: center;
+      margin-top: 8px;
+      font-size: 0.8rem;
+      color: #7a7a9a;
+    }
+
+    /* ── Log ── */
+    #log {
+      width: 300px;
+      height: 290px;
+      background: #0d0d1a;
+      border-radius: 4px;
+      padding: 8px;
+      overflow-y: auto;
+      font-size: 0.78rem;
+      line-height: 1.6;
+    }
+
+    /* ── Botones ── */
+    .botones {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin-top: 20px;
+    }
+
+    button {
+      padding: 10px 28px;
+      border: none;
+      border-radius: 6px;
+      font-family: 'Courier New', monospace;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    button:hover { opacity: 0.85; }
+
+    #btn-run   { background: #1a6b3a; color: white; }
+    #btn-pause { background: #7a6b1a; color: white; }
+    #btn-stop  { background: #7a1a1a; color: white; }
+  </style>
+</head>
+<body>
+
+  <h1>🌱 ROBOT AGRÍCOLA — MONITOR</h1>
+  <div id="estado-robot">● CARGANDO...</div>
+
+  <div class="contenedor">
+
+    <div class="panel">
+      <div class="panel-titulo">MAPA DE HUMEDAD</div>
+      <div id="mapa"></div>
+      <div class="leyenda">
+        <span><div class="dot" style="background:#2d2d4a"></div> Sin revisar</span>
+        <span><div class="dot" style="background:#1a7a4a"></div> Húmedo</span>
+        <span><div class="dot" style="background:#8b1a1a"></div> Seco</span>
+      </div>
+      <div id="contador">Cuadrantes: 0 / 36</div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-titulo">LOG DE MENSAJES</div>
+      <div id="log"></div>
+    </div>
+
+  </div>
+
+  <div class="botones">
+    <button id="btn-run"   onclick="enviarCmd('R')">▶ RUN</button>
+    <button id="btn-pause" onclick="enviarCmd('P')">⏸ PAUSE</button>
+    <button id="btn-stop"  onclick="enviarCmd('S')">■ STOP</button>
+  </div>
+
+<script>
+  // ── Construir mapa ──────────────────────────────────────────────
+  const mapaDiv = document.getElementById("mapa");
+  for (let i = 1; i <= 36; i++) {
+    const celda = document.createElement("div");
+    celda.className = "celda";
+    celda.id = `c${i}`;
+    celda.textContent = String(i).padStart(2, "0");
+    mapaDiv.appendChild(celda);
+  }
+
+  // ── Cargar estado inicial ───────────────────────────────────────
+  fetch("/estado").then(r => r.json()).then(data => {
+    actualizarEstadoRobot(data.robot);
+    for (const [num, est] of Object.entries(data.cuadrantes)) {
+      actualizarCelda(parseInt(num), est);
+    }
+    for (const linea of data.log) agregarLog(linea);
+  });
+
+  // ── Server-Sent Events ──────────────────────────────────────────
+  const sse = new EventSource("/eventos");
+  sse.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+
+    if (msg.tipo === "cuadrante") {
+      actualizarCelda(msg.num, msg.estado);
+    }
+    if (msg.tipo === "estado") {
+      actualizarEstadoRobot(msg.robot);
+    }
+    if (msg.log) agregarLog(msg.log);
+  };
+
+  // ── Funciones de UI ─────────────────────────────────────────────
+  function actualizarCelda(num, estado) {
+    const celda = document.getElementById(`c${num}`);
+    if (!celda) return;
+    celda.classList.remove("humedo", "seco");
+    if (estado === "H") celda.classList.add("humedo");
+    if (estado === "S") celda.classList.add("seco");
+
+    const revisados = document.querySelectorAll(".celda.humedo, .celda.seco").length;
+    document.getElementById("contador").textContent =
+      `Cuadrantes: ${revisados} / 36`;
+  }
+
+  function actualizarEstadoRobot(estado) {
+    const el = document.getElementById("estado-robot");
+    const info = {
+      "DESCONECTADO": ["● DESCONECTADO",   "#aa4a4a"],
+      "CSTART":       ["● EN CURSO",        "#4aaa6a"],
+      "CPAUSE":       ["⏸ PAUSADO",         "#aaaa4a"],
+      "CSTOP":        ["■ DETENIDO",         "#aa4a4a"],
+      "CFIN":         ["✓ MAPEO COMPLETO",  "#4a7aaa"],
+    };
+    const [texto, color] = info[estado] || ["● " + estado, "#e0e0e0"];
+    el.textContent = texto;
+    el.style.color = color;
+  }
+
+  function agregarLog(linea) {
+    const log = document.getElementById("log");
+    const p = document.createElement("div");
+    p.textContent = linea;
+    log.appendChild(p);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  async function enviarCmd(cmd) {
+    await fetch(`/comando/${cmd}`, { method: "POST" });
+  }
+</script>
+
+</body>
+</html>
