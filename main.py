@@ -77,7 +77,7 @@ async def startup():
     if ok:
         agregar_log("Puerto serial abierto ✓")
     else:
-        agregar_log("ERROR: No se pudo abrir /dev/ttyAMA0")
+        agregar_log("ERROR: No se pudo abrir el puerto serial")
 
 
 @app.on_event("shutdown")
@@ -98,9 +98,10 @@ async def get_estado():
     """Estado completo actual — usado al cargar la página."""
     return estado
 
+from starlette.requests import Request
 
 @app.get("/eventos")
-async def eventos(request):
+async def eventos(request: Request):
     """Server-Sent Events — stream en tiempo real al navegador."""
     q = asyncio.Queue(maxsize=50)
     clientes.append(q)
@@ -114,7 +115,7 @@ async def eventos(request):
                     evento = await asyncio.wait_for(q.get(), timeout=1.0)
                     yield f"data: {json.dumps(evento)}\n\n"
                 except asyncio.TimeoutError:
-                    yield ": ping\n\n"   # mantiene la conexión viva
+                    yield ": ping\n\n"
         finally:
             clientes.remove(q)
 
